@@ -1,41 +1,51 @@
+import axios from 'axios';
 import { useEffect, useRef, useState } from 'react';
 
+interface Card {
+    id: number;
+    title: string;
+    url: string;
+    thumbnailUrl: string;
+}
+
 function App() {
-    const [cardList, setCardList] = useState<number[]>(new Array(25).fill(0).map((value, index) => index + 1));
+    const [cardList, setCardList] = useState<Card[]>([]);
     const [isLoading, setIsLoading] = useState<boolean>(false);
-    const loaderRef = useRef<HTMLDivElement>(null);
+    const loaderRef = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
+        const fetchPhotos: () => Promise<void> = async () => {
+            setIsLoading(true);
+            await axios
+                .get<Card[]>('https://jsonplaceholder.typicode.com/photos')
+                .then((res) => {
+                    setCardList((prev) => [...prev, ...res.data.slice(prev.length, prev.length + 50)]);
+                })
+                .catch((err) => console.log(err))
+                .finally(() => setIsLoading(false));
+        };
+
         const options = {
             root: null, // 根元素
             rootMargin: '0px', // 預留空間
             threshold: 0.5, // 監聽閾值
         };
 
-        const observer = new IntersectionObserver((entries) => {
-            entries.forEach((entry) => {
-                if (entry.isIntersecting) {
-                    setIsLoading(true); // 設定為正在加載中
-                    setTimeout(() => {
-                        setCardList((prev) => [
-                            ...prev,
-                            ...new Array(25).fill(0).map((value, index) => prev.length + index + 1),
-                        ]);
-                        setIsLoading(false); // 設定為加載結束
-                    }, 1500); // 延遲3秒後再觸發回調函數
+        const observer: IntersectionObserver = new IntersectionObserver((entries) => {  // 創建一個監聽物件，並傳入一個回調函數，當被觀察的元素進入可視範圍時，便會觸發回調函數
+            entries.forEach((entry) => {  // 遍歷觀察的元素，並判斷是否進入可視範圍
+                if (entry.isIntersecting) {  // isIntersecting 屬性，代表元素是否進入可視範圍
+                    fetchPhotos();
                 }
             });
         }, options);
 
-        // loaderRef.current 有值的話，就觀察 loaderRef.current 的元素
-    if (loaderRef.current) {
-            observer.observe(loaderRef.current);
+        if (loaderRef.current) {  // 當 loaderRef.current 為真時，說明 loaderRef 已經有元素被指定
+            observer.observe(loaderRef.current);  // 通過監聽物件的 observe 方法，對 loaderRef.current 元素進行觀察
         }
 
-        // return 一個無名函式，在元件卸載時，如果 loaderRef.current 有值的話，就取消觀察 loaderRef.current 的元素
         return () => {
             if (loaderRef.current) {
-                observer.unobserve(loaderRef.current);
+                observer.unobserve(loaderRef.current);  // 當組件銷毀時，使用監聽物件的 unobserve 方法，取消對 loaderRef.current 元素的觀察
             }
         };
     }, []);
@@ -43,16 +53,15 @@ function App() {
     return (
         <>
             <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 max-w-6xl mx-auto py-4">
-                {cardList.map((value, index) => {
-                    return (
-                        <div
-                            key={index}
-                            className="cursor-pointer p-3 m-2 hover:shadow-slate-400 shadow-md rounded-lg border border-slate-400 transition-shadow duration-200 aspect-square flex justify-center items-center"
-                        >
-                            <h3 className="text-3xl text-rose-600">{value}</h3>
-                        </div>
-                    );
-                })}
+                {cardList.map((card) => (
+                    <div
+                        key={card.id}
+                        className="cursor-pointer p-3 m-2 hover:shadow-slate-400 shadow-md rounded-lg border border-slate-400 transition-shadow duration-200 aspect-square"
+                    >
+                        <img src={card.url} alt={card.title} />
+                        <p className="text-center text-2xl text-red-600">{card.id}</p>
+                    </div>
+                ))}
             </div>
             {isLoading && (
                 <div className="text-center py-4">
